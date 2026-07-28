@@ -1,14 +1,14 @@
-###################
-# - VPS - #
-###################
-name: vps-wordpress
+######################
+# - VPS (Wordpress)- #
+######################
+name: vps-${PRODUCT_NAME:-vps}
 
 ############
 # Services #
 ############
 services:
     portainer:
-        container_name: vps-portainer
+        container_name: ${PRODUCT_NAME:-vps}-portainer
         image: portainer/portainer-ce:sts
         hostname: ${PORTAINER_HOST:-portainer}
         domainname: ${PORTAINER_DOMAIN:-${CORE_DOMAIN:-localhost}}
@@ -22,10 +22,13 @@ services:
             - ./volumes/portainer:/data
 
     db:
-        container_name: vps-db
+        container_name: ${PRODUCT_NAME:-vps}-db
         image: mysql:8
         restart: always
-        env_file: .env
+        environment:
+            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+            MYSQL_USER: ${MYSQL_USER}
+            MYSQL_PASSWORD: ${MYSQL_PASSWORD}
         volumes:
             - ./volumes/mysql8:/var/lib/mysql
             - ./configs/mysql/performance.cnf:/etc/mysql/conf.d/performance.cnf
@@ -48,7 +51,7 @@ services:
             - ./configs/php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
 
     wordpress:
-        container_name: vps-wordpress
+        container_name: ${PRODUCT_NAME:-vps}-wordpress
         image: wordpress
         hostname: ${WP_HOST:-www}
         domainname: ${WP_DOMAIN:-${CORE_DOMAIN:-localhost}}
@@ -65,13 +68,14 @@ services:
             - ./configs/php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
 
     nginx:
-        container_name: vps-nginx
+        container_name: ${PRODUCT_NAME:-vps}-nginx
         image: nginx:alpine
         restart: always
         ports:
             - "443:443"
         volumes:
             - ./configs/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+            - ./configs/nginx/conf.d:/etc/nginx/conf.d:ro
             # Clean, dedicated directory for your 15-year Cloudflare keys
             - ./certs:/etc/nginx/certs:ro
             - ./auth:/etc/nginx/auth:ro # Directory holding .htpasswd

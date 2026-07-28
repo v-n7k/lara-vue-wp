@@ -1,2 +1,3 @@
 -- CREATE DATABASE IF NOT EXISTS `phpmyadmin`;
 CREATE DATABASE IF NOT EXISTS `wordpress`;
+GRANT ALL ON `wordpress`.* TO '$MYSQL_USER'@'%';

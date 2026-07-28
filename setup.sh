@@ -1,10 +1,8 @@
 #!/bin/bash
 # Run this on your VPS host machine in the same directory as docker-compose.yml
 
-CONF_FILE="./configs/nginx/nginx.conf"
+VHOSTS_CONF="./configs/nginx/conf.d/vhosts.conf"
 AUTH_FILE="./auth/.htpasswd"
-
-git update-index --assume-unchanged "$CONF_FILE" "$AUTH_FILE"
 
 echo "Initializing proxy generation sequence..."
 
@@ -31,24 +29,7 @@ fi
 
 echo " -> Generating NGINX configuration from Docker Compose labels..."
 
-# 3. Write the core NGINX configuration block
-cat << 'EOF' > "$CONF_FILE"
-events {
-    worker_connections 1024;
-}
-
-http {
-    # Reference the 15-year static Cloudflare keys globally
-    ssl_certificate     /etc/nginx/certs/cloudflare.crt;
-    ssl_certificate_key /etc/nginx/certs/cloudflare.key;
-
-    # Modern TLS standards required by Cloudflare edge nodes
-    ssl_protocols       TLSv1.2 TLSv1.3;
-    ssl_ciphers         HIGH:!aNULL:!MD5;
-
-EOF
-
-# 4. Parse Docker Compose and dynamically map endpoints
+# 3. Parse Docker Compose and dynamically map endpoints
 docker compose config --format json | jq -r '
   .services | to_entries[] |
   select(.value.hostname != null and .value.domainname != null) |
@@ -72,7 +53,7 @@ docker compose config --format json | jq -r '
     fi
 
     # Append the server block
-    cat << EOF >> "$CONF_FILE"
+    cat << EOF >> "$VHOSTS_CONF"
     server {
         listen 443 ssl;
         server_name ${SERVER_NAME};
@@ -89,15 +70,10 @@ docker compose config --format json | jq -r '
 EOF
 done
 
-# 5. Close the HTTP block
-cat << 'EOF' >> "$CONF_FILE"
-}
-EOF
-
 echo "NGINX configuration generated successfully."
 
-# 6. Gracefully reload NGINX if the container is already running
-if docker ps --format '{{.Names}}' | grep -q "vps-nginx"; then
+# 4. Gracefully reload NGINX if the container is already running
+if docker ps --format '{{.Names}}' | grep -q "${PRODUCT_NAME:-vps}-nginx"; then
     echo " -> Reloading NGINX container without dropping connections..."
-    docker exec vps-nginx nginx -s reload
+    docker exec ${PRODUCT_NAME:-vps}-nginx nginx -s reload
 fi

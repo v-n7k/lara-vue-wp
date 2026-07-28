@@ -3,3 +3,5 @@
 volumes/**
 
 certs/*
+configs/nginx/conf.d/*.conf
+auth/.htpasswd
