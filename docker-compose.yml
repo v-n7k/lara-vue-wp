@@ -32,10 +32,10 @@ services:
         volumes:
             - ./volumes/mysql8:/var/lib/mysql
             - ./configs/mysql/performance.cnf:/etc/mysql/conf.d/performance.cnf
-            - ./configs/mysql/init-dbs.sql:/docker-entrypoint-initdb.d/init-dbs.sql:ro
+            - ./configs/mysql/init-dbs.sh:/docker-entrypoint-initdb.d/init-dbs.sh:ro
 
     phpmyadmin:
-        container_name: vps-phpmyadmin
+        container_name: ${PRODUCT_NAME:-vps}-phpmyadmin
         image: phpmyadmin/phpmyadmin:latest
         hostname: ${PMA_HOST:-pma}
         domainname: ${PMA_DOMAIN:-${CORE_DOMAIN:-localhost}}
