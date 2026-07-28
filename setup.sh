@@ -30,6 +30,7 @@ fi
 echo " -> Generating NGINX configuration from Docker Compose labels..."
 
 # 3. Parse Docker Compose and dynamically map endpoints
+: > "$VHOSTS_CONF" # Truncate vhosts
 docker compose config --format json | jq -r '
   .services | to_entries[] |
   select(.value.hostname != null and .value.domainname != null) |
@@ -60,6 +61,9 @@ docker compose config --format json | jq -r '
 
         location / {
             proxy_pass ${schema}://${svc}:${port};
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade \$http_upgrade;
+            proxy_set_header Connection \$connection_upgrade;
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
             proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
