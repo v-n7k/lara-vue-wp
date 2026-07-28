@@ -9,7 +9,7 @@ name: vps-${PRODUCT_NAME:-vps}
 services:
     portainer:
         container_name: ${PRODUCT_NAME:-vps}-portainer
-        image: portainer/portainer-ce:sts
+        image: portainer/portainer-ce:lts # official image
         hostname: ${PORTAINER_HOST:-portainer}
         domainname: ${PORTAINER_DOMAIN:-${CORE_DOMAIN:-localhost}}
         labels:
@@ -23,7 +23,7 @@ services:
 
     db:
         container_name: ${PRODUCT_NAME:-vps}-db
-        image: mysql:8
+        image: mysql:8.4 # official image
         restart: always
         environment:
             MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -31,12 +31,12 @@ services:
             MYSQL_PASSWORD: ${MYSQL_PASSWORD}
         volumes:
             - ./volumes/mysql8:/var/lib/mysql
-            - ./configs/mysql/performance.cnf:/etc/mysql/conf.d/performance.cnf
+            - ./configs/mysql/performance.cnf:/etc/mysql/conf.d/performance.cnf:ro
             - ./configs/mysql/init-dbs.sh:/docker-entrypoint-initdb.d/init-dbs.sh:ro
 
     phpmyadmin:
         container_name: ${PRODUCT_NAME:-vps}-phpmyadmin
-        image: phpmyadmin/phpmyadmin:latest
+        image: phpmyadmin:5.2 # official image
         hostname: ${PMA_HOST:-pma}
         domainname: ${PMA_DOMAIN:-${CORE_DOMAIN:-localhost}}
         labels:
@@ -52,7 +52,7 @@ services:
 
     wordpress:
         container_name: ${PRODUCT_NAME:-vps}-wordpress
-        image: wordpress
+        image: wordpress:6.8 # official image
         hostname: ${WP_HOST:-www}
         domainname: ${WP_DOMAIN:-${CORE_DOMAIN:-localhost}}
         restart: always
