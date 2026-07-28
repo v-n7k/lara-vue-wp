@@ -86,5 +86,6 @@ if docker ps --format '{{.Names}}' | grep -qx "$NGINX_CONTAINER"; then
         docker exec "$NGINX_CONTAINER" nginx -s reload
     else
         echo " -> ERROR: nginx config test failed — reload skipped, old config still active." >&2
+        exit 1
     fi
 fi
