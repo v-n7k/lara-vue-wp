@@ -4,6 +4,8 @@
 VHOSTS_CONF="./configs/nginx/conf.d/vhosts.conf"
 AUTH_FILE="./auth/.htpasswd"
 
+NGINX_CONTAINER="${PRODUCT_NAME:-vps}-nginx"
+
 echo "Initializing proxy generation sequence..."
 
 # 1. Safely load variables directly from .env (Best Practice for secrets)
@@ -77,7 +79,7 @@ done
 echo "NGINX configuration generated successfully."
 
 # 4. Gracefully reload NGINX if the container is already running
-if docker ps --format '{{.Names}}' | grep -q "${PRODUCT_NAME:-vps}-nginx"; then
+if docker ps --format '{{.Names}}' | grep -qx "$NGINX_CONTAINER"; then
     echo " -> Reloading NGINX container without dropping connections..."
-    docker exec ${PRODUCT_NAME:-vps}-nginx nginx -s reload
+    docker exec "$NGINX_CONTAINER" nginx -s reload
 fi
