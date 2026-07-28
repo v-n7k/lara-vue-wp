@@ -4,8 +4,6 @@
 VHOSTS_CONF="./configs/nginx/conf.d/vhosts.conf"
 AUTH_FILE="./auth/.htpasswd"
 
-NGINX_CONTAINER="${PRODUCT_NAME:-vps}-nginx"
-
 echo "Initializing proxy generation sequence..."
 
 # 1. Safely load variables directly from .env (Best Practice for secrets)
@@ -14,6 +12,8 @@ if [ -f ".env" ]; then
     . .env
     set +a
 fi
+
+NGINX_CONTAINER="${PRODUCT_NAME:-vps}-nginx"
 
 # 2. Generate the Basic Auth file if credentials exist
 if [ -n "$BASIC_AUTH_USER" ] && [ -n "$BASIC_AUTH_PASSWORD" ]; then
