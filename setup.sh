@@ -80,6 +80,11 @@ echo "NGINX configuration generated successfully."
 
 # 4. Gracefully reload NGINX if the container is already running
 if docker ps --format '{{.Names}}' | grep -qx "$NGINX_CONTAINER"; then
-    echo " -> Reloading NGINX container without dropping connections..."
-    docker exec "$NGINX_CONTAINER" nginx -s reload
+    echo " -> Validating NGINX configuration..."
+    if docker exec "$NGINX_CONTAINER" nginx -t; then
+        echo " -> Reloading NGINX container without dropping connections..."
+        docker exec "$NGINX_CONTAINER" nginx -s reload
+    else
+        echo " -> ERROR: nginx config test failed — reload skipped, old config still active." >&2
+    fi
 fi
