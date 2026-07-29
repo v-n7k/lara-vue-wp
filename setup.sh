@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Run this on your VPS host machine in the same directory as docker-compose.yml
+set -euo pipefail
 
 VHOSTS_CONF="./configs/nginx/conf.d/vhosts.conf"
 AUTH_FILE="./auth/.htpasswd"
 
-echo "Initializing proxy generation sequence..."
+echo " -> Initializing proxy generation sequence..."
 
 # 1. Safely load variables directly from .env (Best Practice for secrets)
 if [ -f ".env" ]; then
@@ -16,7 +17,7 @@ fi
 NGINX_CONTAINER="${PRODUCT_NAME:-vps}-nginx"
 
 # 2. Generate the Basic Auth file if credentials exist
-if [ -n "$BASIC_AUTH_USER" ] && [ -n "$BASIC_AUTH_PASSWORD" ]; then
+if [ -n "${BASIC_AUTH_USER:-}" ] && [ -n "${BASIC_AUTH_PASSWORD:-}" ]; then
     echo " -> Generating .htpasswd for user: $BASIC_AUTH_USER"
 
     # Use OpenSSL (natively available on the Linux host) to generate the hash
