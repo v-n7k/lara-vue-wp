@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Run this on your VPS host machine in the same directory as docker-compose.yml
+set -euo pipefail
 
 VHOSTS_CONF="./configs/nginx/conf.d/vhosts.conf"
 AUTH_FILE="./auth/.htpasswd"
@@ -16,7 +17,7 @@ fi
 NGINX_CONTAINER="${PRODUCT_NAME:-vps}-nginx"
 
 # 2. Generate the Basic Auth file if credentials exist
-if [ -n "$BASIC_AUTH_USER" ] && [ -n "$BASIC_AUTH_PASSWORD" ]; then
+if [ -n "${BASIC_AUTH_USER:-}" ] && [ -n "${BASIC_AUTH_PASSWORD:-}" ]; then
     echo " -> Generating .htpasswd for user: $BASIC_AUTH_USER"
 
     # Use OpenSSL (natively available on the Linux host) to generate the hash
