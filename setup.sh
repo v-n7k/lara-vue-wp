@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Run this on your VPS host machine in the same directory as docker-compose.yml
 
 VHOSTS_CONF="./configs/nginx/conf.d/vhosts.conf"
