@@ -1,103 +1,122 @@
 # VPS WordPress Backbone
 
-## Introduction
-This project is a flexible, highly portable, and dynamic Docker Compose backbone for deploying and managing your own WordPress environment on a Virtual Private Server (VPS). It utilizes a containerized architecture to ensure you can easily, without loosing any data, migrate from one server to another, spin up new subdomains instantly, and securely manage your applications behind an NGINX reverse proxy.
+![Docker Compose](https://img.shields.io/badge/Docker%20Compose-v2-2496ED?logo=docker&logoColor=white)
+![WordPress](https://img.shields.io/badge/WordPress-6.8-21759B?logo=wordpress&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8.4-4479A1?logo=mysql&logoColor=white)
+![NGINX](https://img.shields.io/badge/NGINX-alpine-009639?logo=nginx&logoColor=white)
 
-## Included Services
-The `docker-compose.yml` orchestrates the following core services:
+A portable Docker Compose stack for running WordPress on a VPS behind an automatically configured NGINX reverse proxy. A single `.env` file drives domains, credentials, and container naming, and `setup.sh` turns `docker-compose.yml` labels into NGINX virtual hosts — no hand-written proxy configs.
 
-*   **NGINX (Reverse Proxy):** Acts as the entry point for all traffic on port 443 (HTTPS), automatically routing requests to the correct container based on the hostname.
-*   **WordPress:** The core content management system, running on the latest official image.
-*   **MySQL 8 (db):** The relational database backing WordPress and any other future services.
-*   **phpMyAdmin:** A web-based interface for managing the MySQL database.
-*   **Portainer:** A lightweight management UI to easily monitor and control your Docker containers.
+## Table of Contents
 
-## Prerequisites
-*   A Linux VPS.
-*   Docker and Docker Compose installed.
-*   A domain name pointing to your VPS IP address.
-*   Your 15-year static Cloudflare origin certificates placed in `./certs/cloudflare.crt` and `./certs/cloudflare.key`.
+- [Quick Start](#quick-start)
+- [Included Services](#included-services)
+- [Prerequisites](#prerequisites)
+- [Configuration (`.env`)](#configuration-env)
+- [The Setup Script (`setup.sh`)](#the-setup-script-setupsh)
+- [Proxying a Service](#proxying-a-service)
+- [Built-in NGINX Behavior](#built-in-nginx-behavior)
+- [HTTPS Behind the Proxy](#https-behind-the-proxy)
+- [Database Initialization](#database-initialization)
+- [Backup & Restore](#backup--restore)
+- [Migration](#migration)
 
-## Configuration Workflow
-This architecture uses an `.env` file to centrally manage all domains and secrets, ensuring no hard-coded sensitive data exists in your compose files.
+## Quick Start
 
-1.  **Clone the Repository:** Pull your project into your desired VPS directory.
-2.  **Prepare the Environment:** Duplicate or create an `.env` file based on the provided sample and populate it with your specific domain names and secure passwords.
+```bash
+# 1. Clone the repository onto your VPS
+git clone <repo-url> vps-wordpress && cd vps-wordpress
 
-## The Setup Script (`setup.sh`)
-The core power of this backbone lies in the `setup.sh` file. Instead of manually writing complex NGINX configurations, this script parses your `docker-compose.yml` file, reads the `.env` variables, and dynamically builds `nginx.conf` and HTTP Basic Authentication files.
+# 2. Create your environment file and fill in domains and passwords
+cp .env.example .env
 
-**What the script does:**
+# 3. Place your Cloudflare origin certificates
+#    ./certs/cloudflare.crt
+#    ./certs/cloudflare.key
 
-*   Reads the `.env` file to securely access credentials.
-*   Uses OpenSSL to generate an `.htpasswd` file inside the `./auth/` directory for services requiring extra security (like phpMyAdmin and Portainer).
-*   Extracts `hostname`, `domainname`, and `nginx.*` labels from the `docker-compose.yml` to automatically map virtual hosts (vhosts).
-*   Generates the final `./configs/nginx/nginx.conf` file configured for strict HTTPS and Cloudflare TLS standards.
-*   Seamlessly reloads NGINX if the container is already running to apply new changes with zero downtime.
+# 4. Generate the NGINX vhosts and Basic Auth file
+bash setup.sh
 
-## How to Use This Project
-
-**Initial Deployment**
-
-1.  Verify your `.env` variables and Cloudflare certificates are in place.
-2.  Run the setup script: `bash setup.sh`
-3.  Start the entire stack: `docker compose up -d`
-
-**Making Changes (Domains, Passwords, Adding Services)**
-
-1.  Update the relevant variables in your `.env` file or modify the labels in `docker-compose.yml`.
-2.  Run `bash setup.sh` to regenerate the configurations. The script will automatically trigger NGINX to reload its configuration.
-
-## Advanced Features
-*   **Dynamic Routing:** Want to change your Portainer URL? Just update `PORTAINER_HOST` in `.env` and run the setup script.
-*   **Basic Auth Protection:** To protect any service with HTTP Basic Auth, simply add the label `nginx.auth: "true"` to its service block in `docker-compose.yml`. The script will handle the rest.
-*   **Portability:** To migrate, simply copy this directory (including the `.env` and mounted volumes) to a new server with Docker installed, point your DNS, and run `docker compose up -d`.
-
-## Explaining Docker Compose Parameters for `setup.sh`
-
-The `setup.sh` script inspects each service block in `docker-compose.yml` to automatically build reverse proxy routes and security policies. To enable automatic proxying for a service, both `hostname` and `domainname` **must** be set.
-
-### Domain Name Resolution (`hostname` & `domainname`)
-
-* **`hostname`**: Specifies the subdomain prefix for the container (e.g., `prt`, `pma`, `www`).
-* **`domainname`**: Specifies the base or core domain for the service (e.g., `myproject.com`).
-
-#### Transformation Logic
-During execution, `setup.sh` extracts both properties and combines them into the Fully Qualified Domain Name (FQDN) used for NGINX's `server_name` directive:
-
-`FQDN = ${hostname}.${domainname}`
-
-**Example:**
-If `hostname: prt` and `domainname: myproject.com`, `setup.sh` generates:
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name prt.myproject.com;
-    ...
-}
+# 5. Start the stack
+docker compose up -d
 ```
 
----
+WordPress is then available at `https://www.<CORE_DOMAIN>` (and the bare `<CORE_DOMAIN>`), phpMyAdmin at `https://pma.<CORE_DOMAIN>`, and Portainer at `https://portainer.<CORE_DOMAIN>` — unless you override the hosts in `.env`.
 
-### Custom Control Labels (`labels:`)
+## Included Services
 
-You can control upstream protocols, port mappings, and access restrictions by attaching specific `nginx.*` labels to any service:
+| Service | Image | Purpose |
+| :--- | :--- | :--- |
+| **NGINX** | `nginx:alpine` | Reverse proxy; sole entry point, listens on port 443 (HTTPS) and routes by hostname |
+| **WordPress** | `wordpress:6.8` | The content management system |
+| **MySQL** | `mysql:8.4` | Relational database backing WordPress and future services |
+| **phpMyAdmin** | `phpmyadmin:5.2` | Web UI for managing MySQL (Basic Auth protected) |
+| **Portainer** | `portainer/portainer-ce:lts` | Docker management UI (Basic Auth protected) |
+
+Images are pinned to stable/LTS versions. All containers are named `${PRODUCT_NAME}-<service>` (e.g. `wp-nginx`), so multiple stacks can coexist on one host.
+
+## Prerequisites
+
+*   A Linux VPS with Docker and Docker Compose v2 (`docker compose`) installed.
+*   `jq` and `openssl` available on the host — `setup.sh` uses them to parse the compose file and hash the Basic Auth password.
+*   A domain name with DNS records for your subdomains pointing to the VPS IP.
+*   Cloudflare origin certificates placed in `./certs/cloudflare.crt` and `./certs/cloudflare.key`.
+
+## Configuration (`.env`)
+
+All domains, secrets, and naming live in `.env` (never committed). Start from `.env.example`:
+
+| Variable | Description |
+| :--- | :--- |
+| `PRODUCT_NAME` | Prefix for the compose project and all container names (e.g. `wp` → `wp-nginx`) |
+| `CORE_DOMAIN` | Default base domain for all services |
+| `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD` | Credentials for HTTP Basic Auth on protected services (phpMyAdmin, Portainer) |
+| `WP_HOST` / `WP_DOMAIN` | WordPress FQDN parts (defaults: `www` . `CORE_DOMAIN`) |
+| `PMA_HOST` / `PMA_DOMAIN` | phpMyAdmin FQDN parts (defaults: `pma` . `CORE_DOMAIN`) |
+| `PORTAINER_HOST` / `PORTAINER_DOMAIN` | Portainer FQDN parts (defaults: `portainer` . `CORE_DOMAIN`) |
+| `MYSQL_ROOT_PASSWORD` | MySQL root password |
+| `MYSQL_USER` / `MYSQL_PASSWORD` | Application database user, granted full access to the `wordpress` database |
+
+A service's FQDN is always `HOST.DOMAIN`. Services whose `hostname` is `www` also answer for the bare (apex) domain.
+
+## The Setup Script (`setup.sh`)
+
+Instead of manually writing NGINX configuration, `setup.sh` generates it from your compose file:
+
+1.  Loads variables from `.env`.
+2.  Generates `./auth/.htpasswd` with OpenSSL if `BASIC_AUTH_USER` and `BASIC_AUTH_PASSWORD` are set.
+3.  Parses `docker compose config` with `jq` and writes one `server` block per proxied service to `./configs/nginx/conf.d/vhosts.conf`.
+4.  If the NGINX container is already running, validates the new configuration with `nginx -t` and gracefully reloads it with zero downtime. On a failed validation the old config stays active and the script exits with status `1`, so cron jobs and CI can detect the failure.
+
+Generated artifacts (`certs/*`, `configs/nginx/conf.d/*.conf`, `auth/.htpasswd`) are git-ignored — only `configs/nginx/nginx.conf` (the static base config) is committed.
+
+**Making changes** (domains, passwords, adding services): edit `.env` or the labels in `docker-compose.yml`, then re-run `bash setup.sh`. New containers still need `docker compose up -d`.
+
+## Proxying a Service
+
+`setup.sh` inspects every service block in `docker-compose.yml`. To enable automatic proxying for a service, both `hostname` and `domainname` **must** be set:
+
+*   **`hostname`** — the subdomain prefix (e.g. `portainer`, `pma`, `www`).
+*   **`domainname`** — the base domain (e.g. `myproject.com`).
+
+They combine into the FQDN used for NGINX's `server_name`: `FQDN = ${hostname}.${domainname}`.
+
+### Control Labels
+
+Optional `nginx.*` labels tune how NGINX talks to the service:
 
 | Label | Supported Values | Default | Description |
 | :--- | :--- | :--- | :--- |
-| **`nginx.auth`** | `"true"` \| `"false"` | `"false"` | Enables HTTP Basic Authentication. When set to `"true"`, `setup.sh` injects `auth_basic` protection using the `.htpasswd` file generated from `.env`. |
-| **`nginx.schema`** | `"http"` \| `"https"` | `"http"` | Sets the upstream proxy protocol used by NGINX in `proxy_pass` (e.g., `proxy_pass https://portainer:9443;`). |
-| **`nginx.port`** | `"<port_number>"` | `"80"` | Specifies the internal container port that NGINX routes traffic to. |
+| **`nginx.auth`** | `"true"` \| `"false"` | `"false"` | Enables HTTP Basic Authentication using the generated `.htpasswd` |
+| **`nginx.schema`** | `"http"` \| `"https"` | `"http"` | Upstream protocol used in `proxy_pass` |
+| **`nginx.port`** | `"<port_number>"` | `"80"` | Internal container port NGINX routes traffic to |
 
----
-
-### Example Configuration
+### Example
 
 ```yaml
     portainer:
-        container_name: vps-portainer
-        image: portainer/portainer-ce:sts
+        container_name: ${PRODUCT_NAME:-vps}-portainer
+        image: portainer/portainer-ce:lts
         # Resolves to: portainer.vps-wp.localhost
         hostname: ${PORTAINER_HOST:-portainer}
         domainname: ${PORTAINER_DOMAIN:-${CORE_DOMAIN:-localhost}}
@@ -107,3 +126,49 @@ You can control upstream protocols, port mappings, and access restrictions by at
             nginx.port: "9443"     # Forward traffic to internal port 9443
         restart: always
 ```
+
+## Built-in NGINX Behavior
+
+*   **HTTPS only** — TLS 1.2/1.3 terminated with the Cloudflare origin certificates; nothing listens on port 80.
+*   **Bare-IP scan rejection** — a catch-all `default_server` rejects TLS handshakes that don't match a configured hostname.
+*   **WebSocket support** — `Upgrade`/`Connection` headers are forwarded to upstreams.
+*   **Compression** — gzip enabled for CSS, JS, JSON, and SVG.
+*   **Uploads up to 64 MB** — `client_max_body_size 64m`, matched by the PHP limits in `configs/php/uploads.ini` (mounted read-only into WordPress and phpMyAdmin).
+
+## HTTPS Behind the Proxy
+
+NGINX terminates TLS and talks plain HTTP to the WordPress container. WordPress is configured (via `WORDPRESS_CONFIG_EXTRA`) to trust the `X-Forwarded-Proto` header, so it correctly treats requests as HTTPS — no redirect loops or mixed-content issues.
+
+## Database Initialization
+
+On the first start with an empty `./volumes/mysql8`, MySQL runs `configs/mysql/init-dbs.sh`, which creates the `wordpress` database and grants `MYSQL_USER` full access to it. It only runs on a fresh data directory — to re-run it, remove `./volumes/mysql8` (this destroys all data).
+
+## Backup & Restore
+
+All persistent state lives in `./volumes/` plus your `.env` file.
+
+**Full (cold) backup** — stop the stack and archive the whole project directory:
+
+```bash
+docker compose stop
+tar -czf ../vps-wordpress-backup-$(date +%F).tar.gz .
+docker compose start
+```
+
+**Database dump (hot)** — no downtime, uses the credentials already inside the container:
+
+```bash
+docker compose exec db sh -c 'exec mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" wordpress' > wordpress-$(date +%F).sql
+```
+
+**Database restore:**
+
+```bash
+docker compose exec -T db sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" wordpress' < wordpress-backup.sql
+```
+
+WordPress files (themes, plugins, uploads) live in `./volumes/wordpress` and can be copied directly.
+
+## Migration
+
+All state lives in this directory. To move servers: copy it (including `.env` and `./volumes/`) to the new host, point DNS at the new IP, run `bash setup.sh`, then `docker compose up -d`.
