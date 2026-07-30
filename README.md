@@ -76,6 +76,7 @@ All domains, secrets, and naming live in `.env` (never committed). Start from `.
 | `PORTAINER_HOST` / `PORTAINER_DOMAIN` | Portainer FQDN parts (defaults: `portainer` . `CORE_DOMAIN`) |
 | `MYSQL_ROOT_PASSWORD` | MySQL root password |
 | `MYSQL_USER` / `MYSQL_PASSWORD` | Application database user, granted full access to the `wordpress` database |
+| `MYSQL_PORT` | Host port for MySQL, published on `127.0.0.1` only. Empty or unset means `3306` — see [Connecting from the Host](#connecting-from-the-host) |
 
 A service's FQDN is always `HOST.DOMAIN`. Services whose `hostname` is `www` also answer for the bare (apex) domain.
 
@@ -142,6 +143,30 @@ NGINX terminates TLS and talks plain HTTP to the WordPress container. WordPress 
 ## Database Initialization
 
 On the first start with an empty `./volumes/mysql8`, MySQL runs `configs/mysql/init-dbs.sh`, which creates the `wordpress` database and grants `MYSQL_USER` full access to it. It only runs on a fresh data directory — to re-run it, remove `./volumes/mysql8` (this destroys all data).
+
+### Connecting from the Host
+
+Other containers always reach the database at `db:3306` over the compose network. For host-side tools — a GUI client, `mysql`, an IDE — the `db` service also publishes the port on the loopback interface:
+
+```yaml
+ports:
+    - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+```
+
+Connect to `127.0.0.1:3306` with `MYSQL_USER` / `MYSQL_PASSWORD`. If the host already runs its own MySQL on 3306, set `MYSQL_PORT` in `.env` to a free port — otherwise the container fails to start with `address already in use`.
+
+Two things worth knowing about this mapping:
+
+*   **The `127.0.0.1:` prefix is load-bearing.** Without it Docker publishes on every interface and writes its own iptables rules *ahead* of `ufw`/`firewalld`, so the database would be reachable from the whole network no matter what the host firewall says.
+*   **`MYSQL_PORT` cannot switch it off.** The variable chooses *which* port, not *whether* to publish — an empty value falls back to `3306` rather than disabling the mapping. Production therefore also has MySQL on host loopback, which is fine on a single-tenant VPS but worth a second thought on a shared host.
+
+To drop the exposure entirely on a given machine, add a git-ignored `docker-compose.override.yml` (Compose merges it automatically):
+
+```yaml
+services:
+    db:
+        ports: !reset null
+```
 
 ## Backup & Restore
 
